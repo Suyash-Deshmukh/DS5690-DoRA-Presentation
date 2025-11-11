@@ -9,7 +9,7 @@ Published at the 41st International Conference on Machine Learning (ICML), 2024.
 
 ---
 
-## 1. Paper Overview
+## Paper Overview
 
 [Five-minute overview providing context, stating the problem the paper is addressing, characterizing the approach, and giving a brief account of how the problem was addressed.]: #
 
@@ -22,10 +22,7 @@ It’s efficient, elegant, and adds no inference cost.
 
 But - despite its success - LoRA consistently trails full fine-tuning in accuracy. 
 
-Most prior work simply assumed this was due to LoRA’s limited number of trainable parameters.
-
-The authors of DoRA wanted to investigate this assumption instead of accepting it - to ask why LoRA behaves differently.
-
+Most prior work simply assumed this was due to LoRA’s limited number of trainable parameters, but never looked further into it. The authors of DoRA wanted to change that and investigate this assumption instead of blindly accepting it.
 
 ### Question 1:
 You are a researcher at Nvidia and you want to get a better understanding of how FT and LoRA change the various matrices in your transformer model during training. How might you be able to <i>decompose</i> (take apart and take a closer look at) the changes in matrices?
@@ -42,13 +39,31 @@ You are a researcher at Nvidia and you want to get a better understanding of how
 
 This base concept is what they exploited to understand what is happening under the hood and this is what led to the creation of DoRA!
 
-<object data="images/meda.pdf" type="application/pdf">
-    <embed src="images/meda.pdf">
-    </embed>
-</object>
+So, what did they find when they looked into the decomposed matrix changes during training?
 
+![FT vs LoRA slopes](images/ft_lora_slopes.jpg)
 
-DoRA functions as follows:
+### Question 2:
+After decomposing the changes in matrices during training, we can get a plot which shows change in direction ($\Delta D$) vs change in magnitude ($\Delta M$). Looking at comparison between FT and LoRA, what can we learn about the way they learn from training?
+
+<i>Hint: There is a clear trend in both subfigures. Is this the same type of trend? What might each trend tell us about the relationship between $\Delta D$ and $\Delta M$?</i>
+<details>
+    <summary>
+        Answer
+    </summary>
+
+  FT shows an inverse propotion between $\Delta D$ and $\Delta M$, while LoRA shows a direct propotion! This means that in LoRA bigger changes in direction are always accompanied by bigger changes in magnitude (and vice versa). This is because LoRA does not take advantage of decomposing the matrixes and is unable to fine-tune the direction <u>OR</u> magnitude- only both of them together.
+
+  This is not the case for FT, which has a lot more freedom to learn minor changes and is capable of changing either the direction or the magnitude- leading to higher accuracy.
+</details>
+
+<br>
+
+So, to get closer to FT in accuracy, we need the capability to fine-tune the magnitude and direction on their own! This revalation is what led to the creation of DoRA.
+
+### DoRA functions as follows:
+![Architecture of DoRA](images/dora_architecture.jpg)
+
 1. DoRA decomposes each pre-trained weight W into a magnitude m and direction V.
 2. It then fine-tunes both components separately:
     - The magnitude vector m is trained directly.
@@ -57,22 +72,11 @@ DoRA functions as follows:
 
 This lets DoRA adjust the scale and orientation of weights independently!
 
-They find that DoRA outperforms LoRA on language, vision-language, and reasoning benchmarks; is able to get close to the accuracy of FT; can retain the efficiency of LoRA (only has minimal parameter increase); and can easily be integrated with other PEFT variants. 
+They find that DoRA outperforms LoRA on language, vision-language, and reasoning benchmarks; is able to get close to the accuracy of FT; can retain the efficiency of LoRA (only has minimal parameter increase); and can easily be integrated with other PEFT variants.
 
 ---
 
-## Method Summary
-
-
-
----
-
-## 4. Architecture Overview
-- Formal **pseudocode description** of DoRA
-- Clear comparison vs. LoRA and Full Fine-Tuning
-- Mathematical formulation (Eq. 5 from paper)
-- Diagram of weight decomposition (Figure 1)
-
+## Architecture Overview - Formal Algorithms
 <p>
 Below is a <strong>side-by-side formal pseudocode comparison</strong> between <b>LoRA</b> and <b>DoRA</b>.
 </p>
@@ -223,54 +227,56 @@ Memory Complexity:</b> $\mathcal{O}(r(d + k) + k)$</p>
 </tr>
 </table>
 
-<br>
+---
 
-<p><b>Summary:</b><br>
-DoRA extends LoRA by decomposing pretrained weights into <em>magnitude</em> and <em>direction</em>, updating them separately. 
-This decoupling allows DoRA to reproduce full fine-tuning’s flexibility while preserving LoRA’s efficiency.
-</p>
+## Results!
+
+![FT vs LoRA vs DoRA slopes](images/ft_lora_dora_slopes.jpg)
+
+
+![QDoRA vs QLoRA accuracy](images/qdora.jpg)
+
+
+![Rank Sensitivity of LoRA vs DoRA](images/rank_sensitiviy.jpg)
 
 ---
 
-## 5. Experimental Results
-- Summary of main experiments:
-  - Commonsense reasoning (LLaMA models)
-  - Vision-language tasks (VL-BART, LLaVA)
-  - Compatibility with VeRA (DVoRA)
-- Key performance tables and figures
-- Highlights of improvements (accuracy %, parameter reduction, etc.)
+## Critical Analysis
+- A limitation of DoRA is that since it is designed to enhance LoRA’s performance to more closely resemble that of FT, in cases where LoRA performs better than / matches FT, the advantage of DoRA shrinks.
+
+- The paper looks at text, images, and videos. However, they must further explore time-series domains such as audio to confirm the generality of directional fine-tuning.
+
+- The comparisons made were to baseline PEFT models (LoRA/VeRA). In the rapidly evolving field that is ML, there are already new PEFT algorithms (such as PiSSA or LoFT). Work must be done to not only compare performances but to see if DoRA concepts might be able to be integrated with new PEFT algorithms for greater performance.
 
 ---
 
-## 6. Critical Analysis
-- Strengths of DoRA
-- Limitations or potential weaknesses
-- What could have been analyzed further or validated more thoroughly
-- Open questions raised by this paper
+## Impact and Relevance
+- It is able to get closer to the accuracy of FT while keeping the parameter and inference efficiency of LoRA.
+
+- It is compatible and works as a drop-in replacement for LoRA and can be easily combined with other methods (E.g.: VeRA $\Rightarrow$ DVoRA)
+
+- **Much like LoRA, DoRA lets researchers outside major AI labs fine-tune very large models using limited hardware.**
+    - Researchers like me!
 
 ---
 
-## 7. Impact and Relevance
-- Broader impact on AI fine-tuning
-- Implications for LLMs, LVLMs, and efficient adaptation
-- Future extensions (e.g., QDoRA, audio applications)
-- How it changes the landscape of PEFT research
+## Code Demonstration
+<img src="images/base_AST.png" alt="drawing" width="475"/>
+<img src="images/trained_AST.png" alt="drawing" width="500"/>
+
+Getting this big of an improvement in $< 6$ hours of training on ACCRE. 
+```java
+trainable params: 470,016
+all params: 86,657,280
+trainable%: 0.5424%
+```
 
 ---
 
-## 8. Code Demonstration (Optional)
-- Short Python snippet or pseudocode showing DoRA integration  
-- Link to official [NVLabs/DoRA GitHub repository](https://github.com/NVlabs/DoRA)
-
----
-
-## 9. References & Resource Links
+## References + Resource Links
 Include full citations for all external works mentioned above (LoRA, VeRA, QLoRA, etc.)
 1. [Official Paper (ICML 2024)](https://github.com/NVlabs/DoRA)
 2. [DoRA GitHub Repository](https://github.com/NVlabs/DoRA)
 3. [LoRA Original Paper (Hu et al., 2022)](https://arxiv.org/abs/2106.09685)
 4. [VeRA Paper (Kopiczko et al., 2024)](https://arxiv.org/abs/2402.10362)
 5. [Sebastian Raschka’s DoRA Tutorial](https://sebastianraschka.com/blog/2024/dora.html)
-
-> [!Note]
-> Extra Information
