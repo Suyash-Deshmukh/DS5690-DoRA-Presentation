@@ -11,9 +11,7 @@ Published at the 41st International Conference on Machine Learning (ICML), 2024.
 
 ## Paper Overview
 
-[Five-minute overview providing context, stating the problem the paper is addressing, characterizing the approach, and giving a brief account of how the problem was addressed.]: #
-
-Large pre-trained models like LLaMA and BERT achieve outstanding generalization, but full fine-tuning (FT) — updating every single parameter — is extremely expensive.
+Large pre-trained models like LLaMA and BERT achieve outstanding generalization, but full fine-tuning (FT) - updating every single parameter - is extremely expensive.
 
 To make fine-tuning more efficient, researchers developed Parameter-Efficient Fine-Tuning (PEFT) methods, with LoRA (Low-Rank Adaptation) being one of the most popular.
 
@@ -22,12 +20,12 @@ It’s efficient, elegant, and adds no inference cost.
 
 But - despite its success - LoRA consistently trails full fine-tuning in accuracy. 
 
-Most prior work simply assumed this was due to LoRA’s limited number of trainable parameters, but never looked further into it. The authors of DoRA wanted to change that and investigate this assumption instead of blindly accepting it.
+Most prior work simply assumed this was due to LoRA’s limited number of trainable parameters, but never looked further into it. The authors of the DoRA paper wanted to change that and investigate this assumption instead of blindly accepting it.
 
 ### Question 1:
 You are a researcher at Nvidia and you want to get a better understanding of how FT and LoRA change the various matrices in your transformer model during training. How might you be able to <i>decompose</i> (take apart and take a closer look at) the changes in matrices?
 
-<i>Hint: A Matrix is just another way to represent a vector. Scalars are just numbers (just magnitudes)... what is special about vectors?</i>
+<i>Hint: A Matrix is just another way to represent a vector. Scalars are just numbers ("magnitudes")... what is special about vectors?</i>
 <details>
     <summary>
         Answer
@@ -52,7 +50,7 @@ After decomposing the changes in matrices during training, we can get a plot whi
         Answer
     </summary>
 
-  FT shows an inverse propotion between $\Delta D$ and $\Delta M$, while LoRA shows a direct propotion! This means that in LoRA bigger changes in direction are always accompanied by bigger changes in magnitude (and vice versa). This is because LoRA does not take advantage of decomposing the matrixes and is unable to fine-tune the direction <u>OR</u> magnitude- only both of them together.
+  FT shows an inverse propotion between $\Delta D$ and $\Delta M$, while LoRA shows a direct propotion! This means that in LoRA, bigger changes in direction are always accompanied by bigger changes in magnitude (and vice versa). This is because LoRA does not take advantage of decomposing the matrixes and is unable to fine-tune the direction <u>OR</u> magnitude- only both of them together.
 
   This is not the case for FT, which has a lot more freedom to learn minor changes and is capable of changing either the direction or the magnitude- leading to higher accuracy.
 </details>
