@@ -231,14 +231,44 @@ Memory Complexity:</b> $\mathcal{O}(r(d + k) + k)$</p>
 
 ## Results!
 
+Firstly, DoRA has a inversely propotional relationship between $\Delta D$ and $\Delta M$! Much more closely resembles FT than LoRA.
 ![FT vs LoRA vs DoRA slopes](images/ft_lora_dora_slopes.jpg)
 
+### Commonsense reasoning:
+| Model | Method | Trainable Params (%) | Avg. Accuracy |
+|--------|---------|----------------------|------------------------|
+| LLaMA2-7B | LoRA      | 0.83        | 77.6 |
+| LLaMA2-7B | **DoRA*** | <i>0.43</i> | 80.5 |
+| LLaMA2-7B | **DoRA**  | 0.84        | 79.7 |
+| LLaMA3-8B | LoRA      | 0.70        | 80.8 |
+| LLaMA3-8B | **DoRA*** | <i>0.35</i> | 85.0 |
+| LLaMA3-8B | **DoRA**  | 0.71        | 85.2 |
 
-![QDoRA vs QLoRA accuracy](images/qdora.jpg)
+### Visual question answering, Visual reasoning, and Image captioning:
+Method | Trainable Params (%) | Avg. Accuracy |
+|---------|----------------------|------------------------|
+| FT        | 100         | 77.3 |
+| LoRA      | 5.93        | 76.5 |
+| **DoRA**  | 5.96        | 77.4 |
 
+### Video question answering, and Video captioning:
+Method | Trainable Params (%) | Avg. Accuracy |
+|---------|----------------------|------------------------|
+| FT        | 100         | 87.5 |
+| LoRA      | 5.17        | 83.5 |
+| **DoRA**  | 5.19        | 85.4 |
 
+### Effect of Rank on Commonsense reasoning:
 ![Rank Sensitivity of LoRA vs DoRA](images/rank_sensitiviy.jpg)
 
+### QDoRA: DoRA adaptation of QLoRA:
+
+> [!NOTE]
+> What is Quantized LoRA?
+>
+> PEFT significantly reduces training memory overhead, but we still need a considerable amount of GPU memory to initially load the model weights onto the GPUs. QLoRA suggests <i>quantizing</i> the base frozen model to 4-bit instead of 16-bit, and then fine-tuning with LoRA on top of that.
+
+![QDoRA vs QLoRA accuracy](images/qdora.jpg)
 ---
 
 ## Critical Analysis
@@ -256,13 +286,43 @@ Memory Complexity:</b> $\mathcal{O}(r(d + k) + k)$</p>
 - It is compatible and works as a drop-in replacement for LoRA and can be easily combined with other methods (E.g.: VeRA $\Rightarrow$ DVoRA)
 
 - **Much like LoRA, DoRA lets researchers outside major AI labs fine-tune very large models using limited hardware.**
-    - Researchers like me!
+    - Researchers like us!
 
 ---
 
 ## Code Demonstration
-<img src="images/base_AST.png" alt="drawing" width="475"/>
-<img src="images/trained_AST.png" alt="drawing" width="500"/>
+
+This code snippet is from the GW-Whisper Project. These are the links to the [base GitHub page](https://github.com/vanderbilt-data-science/GW-Whisper/) as well as the [actual train.py](https://github.com/vanderbilt-data-science/GW-Whisper/blob/main/Glitch_classification/src/train.py) I took the code snippet from. If you wish to see and run this code for yourself please feel free to check this project out!
+
+```py
+whisper_model = WhisperModel.from_pretrained(f"openai/whisper-{args.encoder}").encoder.to(device)
+
+module_names = [name for name, module in whisper_model.named_modules()]
+patterns = ["layers.*.self_attn.q_proj", "layers.*.self_attn.k_proj", "layers.*.self_attn.v_proj", "layers.*.self_attn.o_proj"]
+
+matched_modules = []
+for pattern in patterns:
+    matched_modules.extend(fnmatch.filter(module_names, pattern))
+
+if args.method == 'LoRA':
+    lora_config = LoraConfig(r=args.lora_rank, lora_alpha=args.lora_alpha, target_modules=matched_modules)
+    whisper_model_with_lora = get_peft_model(whisper_model, lora_config).to(device)
+
+    for name, param in whisper_model_with_lora.named_parameters():
+        param.requires_grad = 'lora' in name
+
+elif args.method == 'DoRA':
+    lora_config = LoraConfig(use_dora=True, r=args.lora_rank, lora_alpha=args.lora_alpha, target_modules=matched_modules)
+    whisper_model_with_dora = get_peft_model(whisper_model, lora_config).to(device)
+
+    for name, param in whisper_model_with_dora.named_parameters():
+        param.requires_grad = 'lora' in name
+```
+
+Example of a model I ran with DoRA very recently (GitHub page for this project is not up yet as I am still working on the paper):
+
+<img src="images/base_AST.png" alt="base AST" width="475"/>
+<img src="images/trained_AST.png" alt="trained AST" width="500"/>
 
 Getting this big of an improvement in $< 6$ hours of training on ACCRE. 
 ```java
@@ -274,9 +334,11 @@ trainable%: 0.5424%
 ---
 
 ## References + Resource Links
-Include full citations for all external works mentioned above (LoRA, VeRA, QLoRA, etc.)
-1. [Official Paper (ICML 2024)](https://github.com/NVlabs/DoRA)
-2. [DoRA GitHub Repository](https://github.com/NVlabs/DoRA)
-3. [LoRA Original Paper (Hu et al., 2022)](https://arxiv.org/abs/2106.09685)
-4. [VeRA Paper (Kopiczko et al., 2024)](https://arxiv.org/abs/2402.10362)
-5. [Sebastian Raschka’s DoRA Tutorial](https://sebastianraschka.com/blog/2024/dora.html)
+- [DoRA Paper (Liu et al., 2024)](https://arxiv.org/abs/2402.09353)
+- [HuggingFace Page for DoRA](https://huggingface.co/papers/2402.09353)
+- [Official DoRA Project Page](https://nbasyl.github.io/DoRA-project-page/)
+- [DoRA GitHub Repository](https://github.com/NVlabs/DoRA)
+- [Nvidia blogpost on DoRA](https://developer.nvidia.com/blog/introducing-dora-a-high-performing-alternative-to-lora-for-fine-tuning/)
+- [LoRA Paper (Hu et al., 2022)](https://arxiv.org/abs/2106.09685)
+- [VeRA Paper (Kopiczko et al., 2024)](https://arxiv.org/abs/2310.11454)
+- [QLoRA Paper (Dettmers et al., 2023)](https://arxiv.org/abs/2305.14314)
