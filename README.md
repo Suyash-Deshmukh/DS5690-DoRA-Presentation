@@ -71,220 +71,162 @@ Outperforms LoRA while retaining the efficiency.
 - Mathematical formulation (Eq. 5 from paper)
 - Diagram of weight decomposition (Figure 1)
 
-## 🏗️ Architecture Overview
+<p>
+Below is a <strong>side-by-side formal pseudocode comparison</strong> between <b>LoRA</b> and <b>DoRA</b>.
+</p>
 
-Below are the formal algorithms for **LoRA** and **DoRA**.
-
----
 <table>
 <tr>
-<th>LoRA</th>
-<th>DoRA</th>
-</tr>
-<tr>
-<td>
-  
-```
-**Input:**  
-Pretrained weight matrix \( W_0 \in \mathbb{R}^{d \times k} \),  
-training data \( \mathcal{D} = \{(x_i, y_i)\} \),  
-rank \( r \ll \min(d, k) \),  
-learning rate \( \eta \).
+<td width="50%" valign="top">
 
-**Parameters:**  
-- Trainable low-rank matrices:  
-  \( A \in \mathbb{R}^{r \times k} \), \( B \in \mathbb{R}^{d \times r} \)  
-- Fixed pretrained weight: \( W_0 \)
+<h3>Algorithm 1: Low-Rank Adaptation (LoRA)</h3>
 
----
+<hr>
 
-**Algorithm:**
+<p><b>Input:</b><br>
 
-1. **Initialize** \( A \leftarrow 0 \), \( B \leftarrow 0 \)  
-   \( \triangleright \) Ensure pretrained output is unchanged at start.
-2. **Repeat** for each minibatch \( (x, y) \in \mathcal{D} \):
-3. &emsp; **Compute** low-rank update:  
-   &emsp; \( \Delta W \leftarrow B A \)
-4. &emsp; **Form adapted weight:**  
-   &emsp; \( W \leftarrow W_0 + \Delta W \)
-5. &emsp; **Forward pass:**  
-   &emsp; \( \hat{y} \leftarrow f(x; W) \)
-6. &emsp; **Compute loss:**  
-   &emsp; \( \mathcal{L} \leftarrow \ell(\hat{y}, y) \)
-7. &emsp; **Backpropagate gradients** w.r.t. \( A, B \)
-8. &emsp; **Update parameters:**  
-   &emsp; \( A \leftarrow A - \eta \, \nabla_A \mathcal{L} \)  
-   &emsp; \( B \leftarrow B - \eta \, \nabla_B \mathcal{L} \)
-9. **Until** convergence or max epochs reached  
-10. **Return** \( W = W_0 + B A \)
+Pretrained weight matrix $W_0 \in \mathbb{R}^{d \times k}$,  
+training data $\mathcal{D} = \{(x_i, y_i)\}$,  
+rank $r \ll \min(d, k)$,  
+learning rate $\eta$.
+</p>
 
----
+<hr>
 
-**Remarks:**  
-- Only \( A \) and \( B \) are trainable; \( W_0 \) remains frozen.  
-- \( \Delta W = B A \) is rank-\( r \), enabling efficient adaptation.  
-- After fine-tuning, \( W_0 \) and \( \Delta W \) merge for inference with no extra cost.  
-```
-  
+<p><b>Parameters:</b><br>
+
+Trainable low-rank matrices $A \in \mathbb{R}^{r \times k}$, $B \in \mathbb{R}^{d \times r}$.
+</p>
+
+<hr>
+
+<ol>
+<li>
+
+Initialize $A \leftarrow Uniform Kaiming Distribution$, $B \leftarrow 0$.</li>
+<li>
+
+Repeat for each minibatch $(x, y) \in \mathcal{D}$:</li>
+<ul>
+<li>
+
+Compute low-rank update: $\Delta W \leftarrow B A$</li>
+<li>
+
+Form adapted weight: $W \leftarrow W_0 + \Delta W$</li>
+<li>
+
+Forward pass: $\hat{y} \leftarrow f(x; W)$</li>
+<li>
+
+Compute loss: $\mathcal{L} \leftarrow \ell(\hat{y}, y)$</li>
+<li>
+
+Backpropagate gradients w.r.t. $A, B$</li>
+<li>
+
+Update parameters:<br>
+$A \leftarrow A - \eta \nabla_A \mathcal{L}$,  
+$B \leftarrow B - \eta \nabla_B \mathcal{L}$</li>
+</ul>
+<li>
+
+Until convergence or max epochs reached.</li>
+<li>
+
+Return $W = W_0 + B A$.</li>
+</ol>
+<hr>
+
+<p><b>
+
+Memory Complexity:</b> $\mathcal{O}(r(d + k))$</p>
+
 </td>
-<td>
 
-```
-**Input:**  
-Pretrained weight matrix \( W_0 \in \mathbb{R}^{d \times k} \),  
-training data \( \mathcal{D} = \{(x_i, y_i)\} \),  
-rank \( r \ll \min(d, k) \),  
-learning rate \( \eta \).
+<td width="50%" valign="top" style="border-left:1px solid #ccc; padding-left:15px;">
 
-**Parameters:**  
-- <span style="color:green">Magnitude vector \( m = \|W_0\|_c \in \mathbb{R}^{k} \)</span>  
-- <span style="color:green">Direction matrix \( V = \frac{W_0}{\|W_0\|_c} \in \mathbb{R}^{d \times k} \)</span>  
-- <span style="color:green">Trainable magnitude correction \( \Delta m \in \mathbb{R}^{k} \)</span>  
-- Low-rank trainable matrices \( A \in \mathbb{R}^{r \times k},\ B \in \mathbb{R}^{d \times r} \)
+<h3>Algorithm 2: Weight-Decomposed Low-Rank Adaptation (DoRA)</h3>
 
----
+<hr>
 
-**Algorithm:**
+<p><b>Input:</b><br>
 
-1. **Initialize**  
-   \( A \leftarrow 0, \ B \leftarrow 0, \ <span style="color:green">\Delta m \leftarrow 0</span> \)
-2. **Compute base decomposition:**  
-   <span style="color:green">\( m \leftarrow \|W_0\|_c \)</span>  
-   <span style="color:green">\( V \leftarrow W_0 / m \)</span>
-3. **Repeat** for each minibatch \( (x, y) \in \mathcal{D} \):
-4. &emsp; **Compute low-rank directional update:**  
-   <span style="color:green">\( \Delta V \leftarrow B A \)</span>
-5. &emsp; **Form adapted weight:**  
-   <span style="color:green">\( W \leftarrow (m + \Delta m) \cdot \frac{V + \Delta V}{\|V + \Delta V\|_c} \)</span>
-6. &emsp; **Forward pass:**  
-   \( \hat{y} \leftarrow f(x; W) \)
-7. &emsp; **Compute loss:**  
-   \( \mathcal{L} \leftarrow \ell(\hat{y}, y) \)
-8. &emsp; **Backpropagate gradients** w.r.t. \( A, B, <span style="color:green">\Delta m</span> \)
-9. &emsp; **Update parameters:**  
-   \( A \leftarrow A - \eta \, \nabla_A \mathcal{L} \)  
-   \( B \leftarrow B - \eta \, \nabla_B \mathcal{L} \)  
-   <span style="color:green">\( \Delta m \leftarrow \Delta m - \eta \, \nabla_{\Delta m} \mathcal{L} \)</span>
-10. &emsp; **(Optional optimization):**  
-    <span style="color:green">Detach gradient through normalization  
-    \( \nabla_{\|V + \Delta V\|_c} \leftarrow 0 \)</span>
-11. **Until** convergence or max epochs reached  
-12. **Return**  
-    <span style="color:green">\( W = (m + \Delta m) \cdot \frac{V + \Delta V}{\|V + \Delta V\|_c} \)</span>
-```
+Pretrained weight matrix $W_0 \in \mathbb{R}^{d \times k}$,  
+training data $\mathcal{D} = \{(x_i, y_i)\}$,  
+rank $r \ll \min(d, k)$,  
+learning rate $\eta$.
+</p>
+
+<hr>
+
+<p><b>Parameters:</b><br>
+
+Magnitude vector $m = \|W_0\|_c \in \mathbb{R}^{k}$;<br>
+Direction matrix $V = \frac{W_0}{\|W_0\|_c} \in \mathbb{R}^{d \times k}$;<br> Trainable magnitude correction $\Delta m \in \mathbb{R}^{k}$;<br>
+Low-rank trainable matrices $A \in \mathbb{R}^{r \times k}$, $B \in \mathbb{R}^{d \times r}$.<br>
+</p>
+
+<hr>
+
+<ol>
+<li>
+
+Initialize $A \leftarrow Uniform Kaiming Distribution$, $B \leftarrow 0$, $\Delta m \leftarrow 0$.</li>
+<li>
+
+Compute base decomposition:<br>
+$m \leftarrow \|W_0\|_c$,  
+$V \leftarrow W_0 / m$.</li>
+<li>
+
+Repeat for each minibatch $(x, y) \in \mathcal{D}$:</li>
+<ul>
+<li>
+
+Compute low-rank directional update: $\Delta V \leftarrow B A$</li>
+<li>
+
+Form adapted weight: $W \leftarrow (m + \Delta m) \cdot \frac{V + \Delta V}{\|V + \Delta V\|_c}$</li>
+<li>
+
+Forward pass: $\hat{y} \leftarrow f(x; W)$</li>
+<li>
+
+Compute loss: $\mathcal{L} \leftarrow \ell(\hat{y}, y)$</li>
+<li>
+
+Backpropagate gradients w.r.t. $A, B$, $\Delta m$.</li>
+<li>
+
+Update parameters:<br>
+$A \leftarrow A - \eta \nabla_A \mathcal{L}$,  
+$B \leftarrow B - \eta \nabla_B \mathcal{L}$,<br>
+$\Delta m \leftarrow \Delta m - \eta \nabla_{\Delta m} \mathcal{L}$</li>
+</ul>
+<li>
+
+Until convergence or max epochs reached.</li>
+<li>
+
+Return $W = (m + \Delta m) \cdot \frac{V + \Delta V}{\|V + \Delta V\|_c}$.</li>
+</ol>
+<hr>
+
+<p><b>
+
+Memory Complexity:</b> $\mathcal{O}(r(d + k) + k)$</p>
 
 </td>
 </tr>
 </table>
 
-<details open>
-<summary><strong>Algorithm 1: Low-Rank Adaptation (LoRA)</strong></summary>
+<br>
 
-**Input:**  
-Pretrained weight matrix \( W_0 \in \mathbb{R}^{d \times k} \),  
-training data \( \mathcal{D} = \{(x_i, y_i)\} \),  
-rank \( r \ll \min(d, k) \),  
-learning rate \( \eta \).
-
-**Parameters:**  
-- Trainable low-rank matrices:  
-  \( A \in \mathbb{R}^{r \times k} \), \( B \in \mathbb{R}^{d \times r} \)  
-- Fixed pretrained weight: \( W_0 \)
-
----
-
-**Algorithm:**
-
-1. **Initialize** \( A \leftarrow 0 \), \( B \leftarrow 0 \)  
-   \( \triangleright \) Ensure pretrained output is unchanged at start.
-2. **Repeat** for each minibatch \( (x, y) \in \mathcal{D} \):
-3. &emsp; **Compute** low-rank update:  
-   &emsp; \( \Delta W \leftarrow B A \)
-4. &emsp; **Form adapted weight:**  
-   &emsp; \( W \leftarrow W_0 + \Delta W \)
-5. &emsp; **Forward pass:**  
-   &emsp; \( \hat{y} \leftarrow f(x; W) \)
-6. &emsp; **Compute loss:**  
-   &emsp; \( \mathcal{L} \leftarrow \ell(\hat{y}, y) \)
-7. &emsp; **Backpropagate gradients** w.r.t. \( A, B \)
-8. &emsp; **Update parameters:**  
-   &emsp; \( A \leftarrow A - \eta \, \nabla_A \mathcal{L} \)  
-   &emsp; \( B \leftarrow B - \eta \, \nabla_B \mathcal{L} \)
-9. **Until** convergence or max epochs reached  
-10. **Return** \( W = W_0 + B A \)
-
----
-
-**Remarks:**  
-- Only \( A \) and \( B \) are trainable; \( W_0 \) remains frozen.  
-- \( \Delta W = B A \) is rank-\( r \), enabling efficient adaptation.  
-- After fine-tuning, \( W_0 \) and \( \Delta W \) merge for inference with no extra cost.  
-
-**Memory Complexity:** \( O(r(d + k)) \)
-</details>
-
----
-
-<details open>
-<summary><strong>Algorithm 2: Weight-Decomposed Low-Rank Adaptation (DoRA)</strong></summary>
-
-**Input:**  
-Pretrained weight matrix \( W_0 \in \mathbb{R}^{d \times k} \),  
-training data \( \mathcal{D} = \{(x_i, y_i)\} \),  
-rank \( r \ll \min(d, k) \),  
-learning rate \( \eta \).
-
-**Parameters:**  
-- <span style="color:green">Magnitude vector \( m = \|W_0\|_c \in \mathbb{R}^{k} \)</span>  
-- <span style="color:green">Direction matrix \( V = \frac{W_0}{\|W_0\|_c} \in \mathbb{R}^{d \times k} \)</span>  
-- <span style="color:green">Trainable magnitude correction \( \Delta m \in \mathbb{R}^{k} \)</span>  
-- Low-rank trainable matrices \( A \in \mathbb{R}^{r \times k},\ B \in \mathbb{R}^{d \times r} \)
-
----
-
-**Algorithm:**
-
-1. **Initialize**  
-   \( A \leftarrow 0, \ B \leftarrow 0, \ <span style="color:green">\Delta m \leftarrow 0</span> \)
-2. **Compute base decomposition:**  
-   <span style="color:green">\( m \leftarrow \|W_0\|_c \)</span>  
-   <span style="color:green">\( V \leftarrow W_0 / m \)</span>
-3. **Repeat** for each minibatch \( (x, y) \in \mathcal{D} \):
-4. &emsp; **Compute low-rank directional update:**  
-   <span style="color:green">\( \Delta V \leftarrow B A \)</span>
-5. &emsp; **Form adapted weight:**  
-   <span style="color:green">\( W \leftarrow (m + \Delta m) \cdot \frac{V + \Delta V}{\|V + \Delta V\|_c} \)</span>
-6. &emsp; **Forward pass:**  
-   \( \hat{y} \leftarrow f(x; W) \)
-7. &emsp; **Compute loss:**  
-   \( \mathcal{L} \leftarrow \ell(\hat{y}, y) \)
-8. &emsp; **Backpropagate gradients** w.r.t. \( A, B, <span style="color:green">\Delta m</span> \)
-9. &emsp; **Update parameters:**  
-   \( A \leftarrow A - \eta \, \nabla_A \mathcal{L} \)  
-   \( B \leftarrow B - \eta \, \nabla_B \mathcal{L} \)  
-   <span style="color:green">\( \Delta m \leftarrow \Delta m - \eta \, \nabla_{\Delta m} \mathcal{L} \)</span>
-10. &emsp; **(Optional optimization):**  
-    <span style="color:green">Detach gradient through normalization  
-    \( \nabla_{\|V + \Delta V\|_c} \leftarrow 0 \)</span>
-11. **Until** convergence or max epochs reached  
-12. **Return**  
-    <span style="color:green">\( W = (m + \Delta m) \cdot \frac{V + \Delta V}{\|V + \Delta V\|_c} \)</span>
-
----
-
-**Remarks:**  
-- <span style="color:green">Separates magnitude and direction updates for finer control.</span>  
-- <span style="color:green">Uses low-rank updates only for direction (LoRA-style) and direct update for magnitude.</span>  
-- <span style="color:green">Gradient detachment reduces training memory with minimal loss.</span>  
-- Mergeable at inference — same runtime cost as LoRA.  
-
-**Memory Complexity:** \( O(r(d + k) + k) \)
-</details>
-
-
-
-
-
+<p><b>Summary:</b><br>
+DoRA extends LoRA by decomposing pretrained weights into <em>magnitude</em> and <em>direction</em>, updating them separately. 
+This decoupling allows DoRA to reproduce full fine-tuning’s flexibility while preserving LoRA’s efficiency and mergeability.
+</p>
 
 ---
 
